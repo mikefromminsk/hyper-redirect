@@ -6,16 +6,17 @@ services:
       dockerfile: Dockerfile
     restart: always
     network_mode: "host"
+    working_dir: /app/data
+    command: node /app/server.js
     volumes:
-      - ./node1/level:/app/level
-      - ./node1/corestore:/app/corestore
-      - ./node1/config.json:/app/config.json
+      - ./node1:/app/data
     environment:
       - P2P_SEED=hyper1
       - P2P_PORT=59810
-      - API_PORT=13100
-      - P2P_REDIRECT=http://127.0.0.1:13101/debug
-      - P2P_REMOTE_KEY=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+      - API_PORT=13200
+      - P2P_ROOM=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+      - P2P_REMOTE_KEY=38e09fb492e0b3154a6724bc6932db27554aa5b3b9f674e5cefaf1731c2b8ec9,0c385e9b2a9e3d371f8dcc8d5cb087625a9ed3e88c7e7b5d19f20e616af1ca96
+      - P2P_REDIRECT=http://127.0.0.1:13200/append
 
   node2:
     build:
@@ -23,16 +24,35 @@ services:
       dockerfile: Dockerfile
     restart: always
     network_mode: "host"
+    working_dir: /app/data
+    command: node /app/server.js
     volumes:
-      - ./node2/level:/app/level
-      - ./node2/corestore:/app/corestore
-      - ./node2/config.json:/app/config.json
+      - ./node2:/app/data
     environment:
       - P2P_SEED=hyper2
       - P2P_PORT=59811
-      - API_PORT=13101
-      - P2P_REDIRECT=http://127.0.0.1:13100/debug
+      - API_PORT=13301
+      - P2P_ROOM=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
       - P2P_REMOTE_KEY=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+      - P2P_REDIRECT=http://127.0.0.1:13301/append
+
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    network_mode: "host"
+    working_dir: /app/data
+    command: node /app/server.js
+    volumes:
+      - ./node3:/app/data
+    environment:
+      - P2P_SEED=hyper3
+      - P2P_PORT=59812
+      - API_PORT=13302
+      - P2P_ROOM=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+      - P2P_REMOTE_KEY=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+      - P2P_REDIRECT=http://127.0.0.1:13302/append
 
 networks:
   global:
