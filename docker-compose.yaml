@@ -1,0 +1,39 @@
+services:
+
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    network_mode: "host"
+    volumes:
+      - ./node1/level:/app/level
+      - ./node1/corestore:/app/corestore
+      - ./node1/config.json:/app/config.json
+    environment:
+      - P2P_SEED=hyper1
+      - P2P_PORT=59810
+      - API_PORT=13100
+      - P2P_REDIRECT=http://127.0.0.1:13101/debug
+      - P2P_REMOTE_KEY=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    network_mode: "host"
+    volumes:
+      - ./node2/level:/app/level
+      - ./node2/corestore:/app/corestore
+      - ./node2/config.json:/app/config.json
+    environment:
+      - P2P_SEED=hyper2
+      - P2P_PORT=59811
+      - API_PORT=13101
+      - P2P_REDIRECT=http://127.0.0.1:13100/debug
+      - P2P_REMOTE_KEY=6b1f5196123339da7a1018f395e140d72493000158cca5c8cc19952d8ac1119d
+
+networks:
+  global:
+    external: true
