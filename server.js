@@ -19,15 +19,6 @@ process.on('uncaughtException', log)
 
 const configFilename = './config.json'
 
-const loadConfig = () => {
-    try {
-        return fs.existsSync(configFilename) ? JSON.parse(fs.readFileSync(configFilename, 'utf-8')) : {}
-    } catch (e) {
-        log('config read error: ' + e.message)
-        return {}
-    }
-}
-
 let config = {
     API_PORT: 80,
     P2P_SEED: crypto.randomBytes(32).toString('hex'),
@@ -36,22 +27,14 @@ let config = {
     P2P_REMOTE_KEY: '',
     P2P_PORT: 59737,
     P2P_REDIRECT: 'http://localhost:8999',
-    ...loadConfig()
-}
-delete config.remote_redirected
-
-const save = () => {
-    try {
-        fs.writeFileSync(configFilename, JSON.stringify(config, null, 2))
-    } catch (e) {
-        log('config save error: ' + e.message)
-    }
+    P2P_MAX_STORE: 100,
+    ...fs.existsSync(configFilename) ? JSON.parse(fs.readFileSync(configFilename, 'utf-8')) : {}
 }
 
 const put = (key, value) => {
     config[key] = value
     log(key + ': ' + value)
-    save()
+    fs.writeFileSync(configFilename, JSON.stringify(config, null, 2))
 }
 
 for (const key in config)
@@ -75,7 +58,6 @@ const read_int = async (key, fallback = 0) => {
     try { return parseInt(await level.get(key), 10) } catch { return fallback }
 }
 
-
 const corestore = new Corestore('./corestore', {
     primaryKey: crypto.createHash('sha256').update(config.P2P_SEED).digest(),
     unsafe: true
@@ -89,24 +71,27 @@ let redirecting = false
 
 
 const app = express()
-app.use(express.json())
+app.use(express.json({limit: 1024 * 1024}))
 
 app.post('/append', async (req, res) => {
     try {
         if (!req.body.stamp)
             req.body.stamp = crypto.randomInt(100_000_000_000, 1_000_000_000_000)
 
-        if (await read_int('local_stamp_' + req.body.stamp, 0) === 1) {
-            res.json({stamp: req.body.stamp})
-            return
-        }
+        const record = JSON.stringify(req.body)
+
+        if ((localCore?.byteLength || 0) + Buffer.byteLength(record) > config.P2P_MAX_STORE * 1024 * 1024)
+            throw new Error(`Store limit reached: ${config.P2P_MAX_STORE} MB`)
+
+        if (await read_int('local_stamp_' + req.body.stamp, 0) === 1)
+            return res.json({stamp: req.body.stamp})
 
         await level.put('local_stamp_' + req.body.stamp, '1')
-        await localCore.append(JSON.stringify(req.body))
-        res.json({stamp: req.body.stamp})
+        await localCore.append(record)
+        return res.json({stamp: req.body.stamp})
     } catch (e) {
         log(e.message)
-        res.status(400).end()
+        return res.status(500).json({error: e.message})
     }
 })
 
@@ -164,6 +149,7 @@ app.get('/debug',async (req, res) => {
         local_last: local_last,
         swarm_pubkey: swarm?.keyPair.publicKey.toString('hex') || '',
         swarm_peers: Array.from(swarm?.connections || []).map(s => s.remotePublicKey.toString('hex')),
+        store_used_mb: (localCore?.byteLength || 0) / 1024 / 1024,
         logs: logs
     })
 })
