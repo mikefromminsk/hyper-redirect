@@ -87,11 +87,6 @@ let remoteCores = []
 let local_last = null
 let redirecting = false
 
-const advance = async (remote) => {
-    remote.pos++
-    await level.put('remote_pos_' + remote.key, String(remote.pos))
-}
-
 
 const app = express()
 app.use(express.json())
@@ -122,10 +117,10 @@ async function remoteRedirect() {
         for (const remote of remoteCores) {
             while (remote.pos < remote.core.length) {
                 let body = await remote.core.get(remote.pos)
-                let request = JSON.parse(body.toString())
+                let request = JSON.parse(body)
 
                 if (await read_int('local_stamp_' + request.stamp, 0) === 1) {
-                    await advance(remote)
+                    await level.put('remote_pos_' + remote.key, String(++remote.pos))
                     continue
                 }
 
@@ -138,7 +133,8 @@ async function remoteRedirect() {
                     })
                     log('redirect ' + (res.ok ? 'success: ' : 'error: ') + await res.text())
                     if (res.ok) {
-                        await advance(remote)
+                        await level.put('remote_pos_' + remote.key, String(++remote.pos))
+                        await remote.core.clear(remote.pos - 1, remote.pos)
                         continue
                     }
                 } catch (e) {
