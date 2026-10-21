@@ -58,6 +58,8 @@ const read_int = async (key, fallback = 0) => {
     try { return parseInt(await level.get(key), 10) } catch { return fallback }
 }
 
+let local_first_pos = parseInt(await level.get('local_first_pos').catch(() => '0'), 10) || 0
+
 const corestore = new Corestore('./corestore', {
     primaryKey: crypto.createHash('sha256').update(config.P2P_SEED).digest(),
     unsafe: true
@@ -80,8 +82,12 @@ app.post('/append', async (req, res) => {
 
         const record = JSON.stringify(req.body)
 
-        if ((localCore?.byteLength || 0) + Buffer.byteLength(record) > config.P2P_MAX_STORE * 1024 * 1024)
-            throw new Error(`Store limit reached: ${config.P2P_MAX_STORE} MB`)
+        while ((localCore?.byteLength || 0) + Buffer.byteLength(record) > config.P2P_MAX_STORE * 1024 * 1024) {
+            const block = await localCore.get(local_first_pos, {raw: true, wait: false})
+            if (!block) break
+            await localCore.clear(local_first_pos++, local_first_pos)
+            await level.put('local_first_pos', String(local_first_pos))
+        }
 
         if (await read_int('local_stamp_' + req.body.stamp, 0) === 1)
             return res.json({stamp: req.body.stamp})
@@ -144,6 +150,7 @@ app.get('/debug',async (req, res) => {
         ...config,
         room: room,
         local_length: localCore?.length || 0,
+        local_stored: (localCore?.length || 0) - local_first_pos,
         remote_length: remoteCores[0]?.core.length || 0,
         remotes: remoteCores.map(r => ({key: r.key, length: r.core.length, pos: r.pos})),
         local_last: local_last,
