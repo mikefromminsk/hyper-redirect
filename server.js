@@ -55,7 +55,7 @@ const put = (key, value) => {
 }
 
 for (const key in config)
-    if (process.env[key] !== undefined)
+    if (process.env[key])
         put(key, process.env[key])
 
 const is_key = (s) => /^[0-9a-f]{64}$/i.test(s)
@@ -154,7 +154,7 @@ async function redirectJob() {
 }
 
 
-const debug = async (req, res) => {
+app.get('/debug',async (req, res) => {
     res.json({
         ...config,
         room: room,
@@ -166,10 +166,23 @@ const debug = async (req, res) => {
         swarm_peers: Array.from(swarm?.connections || []).map(s => s.remotePublicKey.toString('hex')),
         logs: logs
     })
-}
+})
 
-app.get('/debug', debug)
-app.post('/debug', debug)
+app.post('/config', async (req, res) => {
+    const changed = []
+    for (const key in req.body) {
+        if (config[key] === req.body[key]) continue
+        put(key, req.body[key])
+        changed.push(key)
+    }
+
+    res.json({changed})
+
+    if (changed.length) {
+        log('config changed, restart')
+        setTimeout(() => process.exit(0), 100)
+    }
+})
 
 app.listen(config.API_PORT)
     .on('listening', () => log('SERVER START ON PORT ' + config.API_PORT))
